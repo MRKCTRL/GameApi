@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, exc
 from dotenv import load_dotenv
 import os
 
-
+from celery import AsyncResult
 
 
 
@@ -71,6 +71,9 @@ def save_to_sql(df):
 
 @app.route('/process-data',methods=['GET'])
 def process_data():
+    task = process_data.delay()
+    return jsonify({"task_id": task.id, "status": "Task started"}), 202
+    
     data=fetch_data_from_rapidapi()
     if not data:
         return jsonify({"error": "failed to fetch data from RapidApi"}), 500
@@ -85,8 +88,16 @@ def process_data():
         return jsonify({"error": "Failed to save data to SQL"}), 500
     
     return jsonify({"message": "data processed and saved to SQL successfullu"}), 200
+
    
-    
+@app.route('/task-status/<task-id>', methods=['GET'])
+def task_status(task_id):
+    task_result=AsyncResult(task_id)
+    return jsonify({
+        "task_id":task_id,
+        "status": task_result.status,
+        "result":task_result.result,
+    })    
     
 if __name__=="__name__":
     app.run(debug=True)
